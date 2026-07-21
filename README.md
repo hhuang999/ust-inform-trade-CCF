@@ -8,6 +8,12 @@
 [![Next.js](https://img.shields.io/badge/Next.js-16-000?logo=next.js)](https://nextjs.org)
 [![License](https://img.shields.io/badge/License-MIT-blue)](#-license)
 
+<p align="center">
+  <img src="ust-qrcode.png" alt="扫码访问校园枢纽 UniSwap" width="200" />
+  <br />
+  <sub>📱 手机扫码 · 直达 <a href="https://ust.hhuang999.top">ust.hhuang999.top</a></sub>
+</p>
+
 ---
 
 ## 目录

@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db";
 import type { AiTargetType } from "@prisma/client";
+import { isAiRecommendationEnabled } from "./config";
 import { embedText } from "./embedding";
 import { buildResourceText, contentHash } from "./normalize-resource";
 import { getEmbeddingMeta, upsertEmbedding } from "./embedding-repo";
+import { generateMatchesFor } from "./matching";
 
 const MAX_ATTEMPTS = 3;
 /** 本进程的 worker 标识（cron/脚本每次进程不同；benchmark 多 worker 时各自不同）。 */
@@ -159,6 +161,10 @@ async function runEmbedJob(job: ClaimedJob): Promise<boolean> {
     const { vector, model } = await embedText(text);
     await upsertEmbedding({ targetType, targetId: job.targetId, contentHash: hash, model, vector });
     await markSucceeded(job.id);
+    // 向量就绪后生成跨业务推荐（开关开时；best-effort，内部不抛出）。
+    if (isAiRecommendationEnabled()) {
+      await generateMatchesFor(targetType, job.targetId);
+    }
     return true;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

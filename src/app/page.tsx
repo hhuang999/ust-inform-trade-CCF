@@ -35,6 +35,8 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { SectionHeading } from "@/components/site/section-heading";
 import { ItemCard } from "@/components/site/item-card";
+import { AiMatchCard } from "@/components/ai/ai-match-card";
+import { isAiRecommendationEnabled } from "@/lib/ai/config";
 import { ServiceCard } from "@/components/site/service-card";
 import { NeedCard } from "@/components/site/need-card";
 
@@ -159,6 +161,17 @@ export default async function Home() {
   const latestItems = ok(discovery[3], []);
   const latestServices = ok(discovery[4], []);
   const latestNeeds = ok(discovery[5], []);
+
+  // 个性化推荐：登录用户最新一条 OPEN 需求 → 由 AiMatchCard 取其跨业务推荐。
+  let myNeedId: string | null = null;
+  if (session?.user?.id && isAiRecommendationEnabled()) {
+    const myNeed = await prisma.need.findFirst({
+      where: { requesterId: session.user.id, status: "OPEN", deletedAt: null },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+    myNeedId = myNeed?.id ?? null;
+  }
 
   const productLines = [
     {
@@ -439,6 +452,17 @@ export default async function Home() {
                 />
               ))}
             </div>
+          </PageContainer>
+        ) : null}
+
+        {/* ── 可能适合你的资源（AI 个性化推荐）── */}
+        {myNeedId ? (
+          <PageContainer className="space-y-5 py-10">
+            <SectionHeading
+              title="可能适合你的资源"
+              description="根据你的需求，AI 找到的相关物品与服务"
+            />
+            <AiMatchCard sourceType="NEED" sourceId={myNeedId} />
           </PageContainer>
         ) : null}
 

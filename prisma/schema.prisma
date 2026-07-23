@@ -604,3 +604,22 @@ model AiJob {
 
   @@index([status, createdAt])
 }
+
+/// 跨业务智能撮合推荐（sourceType+sourceId → targetType+targetId，多态无 FK）。
+/// reasons 仅来自规则模板（FEATURE_DEV §8.3），不让模型自由编造。
+model AiRecommendation {
+  id          String       @id @default(cuid())
+  sourceType  AiTargetType
+  sourceId    String
+  targetType  AiTargetType
+  targetId    String
+  score       Float
+  reasons     String[]
+  model       String
+  createdAt   DateTime     @default(now())
+  expiresAt   DateTime?
+
+  @@unique([sourceType, sourceId, targetType, targetId])
+  @@index([sourceType, sourceId, score])
+  @@index([targetType, targetId])
+}

@@ -45,6 +45,7 @@ import { ReportDialog } from "@/components/site/report-dialog";
 import { FavoriteButton } from "@/components/site/favorite-button";
 import { MessageThread } from "@/components/site/message-thread";
 import { ReviewsSection, type ReviewDisplayItem } from "@/components/site/reviews-section";
+import { AiMatchCard } from "@/components/ai/ai-match-card";
 import { loadMessageThread, type MessageThreadData } from "@/lib/messages";
 import { formatDate } from "@/lib/time";
 
@@ -479,6 +480,7 @@ export default async function ItemDetailPage({
 
         {/* ── 右侧栏 ── */}
         <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
+          <AiMatchCard sourceType="ITEM" sourceId={id} />
           <ItemDetailActions
             itemId={item.id}
             isSeller={isSeller}

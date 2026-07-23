@@ -34,6 +34,7 @@ import { ReportDialog } from "@/components/site/report-dialog";
 import { FavoriteButton } from "@/components/site/favorite-button";
 import { MessageThread } from "@/components/site/message-thread";
 import { loadMessageThread, type MessageThreadData } from "@/lib/messages";
+import { AiMatchCard } from "@/components/ai/ai-match-card";
 
 export const dynamic = "force-dynamic";
 
@@ -433,6 +434,7 @@ export default async function ServiceDetailPage({
 
         {/* ── 右侧栏 ── */}
         <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
+          <AiMatchCard sourceType="SERVICE" sourceId={id} />
           <ServiceDetailActions
             serviceId={service.id}
             status={service.status}

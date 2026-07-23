@@ -547,3 +547,60 @@ model Message {
   @@index([contextType, contextId])
   @@index([recipientId, createdAt])
 }
+
+// ───────────────────────── AI（智能发布与撮合）─────────────────────────
+// ResourceEmbedding:三类资源的文本向量(pgvector)。targetType+targetId 多态无 FK。
+// embedding 列为 Unsupported("vector(1024)")——Prisma 客户端不直接读写,
+// 写入与 cosine 查询走 $executeRaw / $queryRaw(见 src/lib/ai/embedding-repo.ts)。
+
+enum AiTargetType {
+  ITEM
+  SERVICE
+  NEED
+}
+
+enum AiJobType {
+  EMBED_RESOURCE
+  REINDEX_ALL
+  MATCH_RESOURCE
+  BENCHMARK
+}
+
+enum AiJobStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+model ResourceEmbedding {
+  id          String       @id @default(cuid())
+  targetType  AiTargetType
+  targetId    String
+  contentHash String
+  model       String
+  embedding   Unsupported("vector(1024)")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([targetType, targetId])
+  @@index([targetType, targetId])
+}
+
+/// AI 异步任务队列(PostgreSQL 轮询,避免引入 Redis)。Worker 用 FOR UPDATE SKIP LOCKED 抢占。
+model AiJob {
+  id          String       @id @default(cuid())
+  type        AiJobType
+  status      AiJobStatus  @default(PENDING)
+  targetType  AiTargetType?
+  targetId    String?
+  payload     Json?
+  attempts    Int          @default(0)
+  workerId    String?
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  error       String?
+  createdAt   DateTime     @default(now())
+
+  @@index([status, createdAt])
+}

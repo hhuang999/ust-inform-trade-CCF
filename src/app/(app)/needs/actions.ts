@@ -5,6 +5,7 @@ import { Prisma } from "@prisma/client";
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { enqueueEmbedResource } from "@/lib/ai/jobs";
 import {
   requireVerifiedUser,
   NotAuthenticatedError,
@@ -96,6 +97,9 @@ export async function createNeed(
     select: { id: true },
   });
 
+  // AI：异步入队生成向量（best-effort）。
+  await enqueueEmbedResource("NEED", need.id);
+
   revalidateNeedRoutes(need.id);
   return { ok: true, needId: need.id };
 }
@@ -138,6 +142,7 @@ export async function updateNeed(
   if (d.contactVisibility !== undefined) data.contactVisibility = d.contactVisibility;
 
   await prisma.need.update({ where: { id: needId }, data });
+  await enqueueEmbedResource("NEED", needId);
   revalidateNeedRoutes(needId);
   return { ok: true };
 }

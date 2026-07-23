@@ -12,6 +12,7 @@ import { SectionHeading } from "@/components/site/section-heading";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import NeedForm from "@/components/site/need-form";
+import { isAiDraftEnabled } from "@/lib/ai/config";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +62,7 @@ export default async function NewNeedPage() {
     <PageContainer className="max-w-3xl">
       <div className="space-y-6">
         <SectionHeading title="发布需求" description="填写信息,让能帮你的同学找到你" />
-        <NeedForm mode="create" userId={user?.id} />
+        <NeedForm mode="create" userId={user?.id} aiDraftEnabled={isAiDraftEnabled()} />
       </div>
     </PageContainer>
   );

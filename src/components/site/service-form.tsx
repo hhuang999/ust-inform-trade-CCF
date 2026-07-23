@@ -27,6 +27,7 @@ import {
   type ServiceUpdateInput,
 } from "@/lib/validation/service";
 import { createService, updateService } from "@/app/(app)/services/actions";
+import { AiDraftPanel, applyDraftToForm } from "@/components/ai/ai-draft-panel";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -94,6 +95,8 @@ interface ServiceFormProps {
   initial?: ServiceFormInitial;
   /** 当前用户 id:create 模式下用于按用户隔离草稿,避免共享设备跨账号泄露。 */
   userId?: string;
+  /** AI 草稿入口是否开启（服务端页面据 AI_DRAFT_ENABLED 传入）。 */
+  aiDraftEnabled?: boolean;
 }
 
 interface FormValues {
@@ -122,6 +125,7 @@ export default function ServiceForm({
   serviceId,
   initial,
   userId,
+  aiDraftEnabled,
 }: ServiceFormProps) {
   const router = useRouter();
   const isEdit = mode === "edit";
@@ -462,6 +466,12 @@ export default function ServiceForm({
       </AlertDialog>
 
       <form onSubmit={onSubmit} className="space-y-6">
+        {aiDraftEnabled ? (
+          <AiDraftPanel
+            type="SERVICE"
+            onApply={(partial) => applyDraftToForm(setValue as never, partial)}
+          />
+        ) : null}
         {/* 基本信息 */}
         <Card>
           <CardHeader>

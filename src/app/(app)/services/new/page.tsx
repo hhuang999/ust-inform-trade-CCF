@@ -12,6 +12,7 @@ import { SectionHeading } from "@/components/site/section-heading";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import ServiceForm from "@/components/site/service-form";
+import { isAiDraftEnabled } from "@/lib/ai/config";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +62,7 @@ export default async function NewServicePage() {
     <PageContainer className="max-w-3xl">
       <div className="space-y-6">
         <SectionHeading title="发布服务" description="填写信息,让有需要的同学找到你" />
-        <ServiceForm mode="create" userId={user?.id} />
+        <ServiceForm mode="create" userId={user?.id} aiDraftEnabled={isAiDraftEnabled()} />
       </div>
     </PageContainer>
   );

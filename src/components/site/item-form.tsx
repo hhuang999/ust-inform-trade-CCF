@@ -29,6 +29,7 @@ import {
   type ItemUpdateInput,
 } from "@/lib/validation/item";
 import { createItem, updateItem } from "@/app/(app)/items/actions";
+import { AiDraftPanel, applyDraftToForm } from "@/components/ai/ai-draft-panel";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -99,6 +100,8 @@ interface ItemFormProps {
   initial?: ItemFormInitial;
   /** 当前用户 id:create 模式下用于按用户隔离草稿,避免共享设备跨账号泄露。 */
   userId?: string;
+  /** AI 草稿入口是否开启（服务端页面据 AI_DRAFT_ENABLED 传入）。 */
+  aiDraftEnabled?: boolean;
 }
 
 interface FormValues {
@@ -125,7 +128,7 @@ function keyToUrl(key: string): string {
 
 // ───────────────────────── 组件 ─────────────────────────
 
-export default function ItemForm({ mode, itemId, initial, userId }: ItemFormProps) {
+export default function ItemForm({ mode, itemId, initial, userId, aiDraftEnabled }: ItemFormProps) {
   const router = useRouter();
   const isEdit = mode === "edit";
   // 草稿按用户隔离:共享设备切换账号时不会读到他人草稿(含联系方式等隐私)。
@@ -516,6 +519,15 @@ export default function ItemForm({ mode, itemId, initial, userId }: ItemFormProp
       </AlertDialog>
 
       <form onSubmit={onSubmit} className="space-y-6">
+        {aiDraftEnabled ? (
+          <AiDraftPanel
+            type="ITEM"
+            imageKeys={images
+              .filter((i) => !i.key.startsWith("pending-"))
+              .map((i) => i.key)}
+            onApply={(partial) => applyDraftToForm(setValue as never, partial)}
+          />
+        ) : null}
         {/* 基本信息 */}
         <Card>
           <CardHeader>

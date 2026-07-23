@@ -21,6 +21,7 @@ import {
   type NeedUpdateInput,
 } from "@/lib/validation/need";
 import { createNeed, updateNeed } from "@/app/(app)/needs/actions";
+import { AiDraftPanel, applyDraftToForm } from "@/components/ai/ai-draft-panel";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -77,6 +78,8 @@ interface NeedFormProps {
   initial?: NeedFormInitial;
   /** 当前用户 id:create 模式下用于按用户隔离草稿,避免共享设备跨账号泄露。 */
   userId?: string;
+  /** AI 草稿入口是否开启（服务端页面据 AI_DRAFT_ENABLED 传入）。 */
+  aiDraftEnabled?: boolean;
 }
 
 interface FormValues {
@@ -93,7 +96,7 @@ interface FormValues {
 
 // ───────────────────────── 组件 ─────────────────────────
 
-export default function NeedForm({ mode, needId, initial, userId }: NeedFormProps) {
+export default function NeedForm({ mode, needId, initial, userId, aiDraftEnabled }: NeedFormProps) {
   const router = useRouter();
   const isEdit = mode === "edit";
   // 草稿按用户隔离:共享设备切换账号时不会读到他人草稿。
@@ -140,6 +143,7 @@ export default function NeedForm({ mode, needId, initial, userId }: NeedFormProp
     handleSubmit,
     control,
     watch,
+    setValue,
     reset,
     setError,
     formState: { errors, isSubmitting, isDirty },
@@ -258,6 +262,12 @@ export default function NeedForm({ mode, needId, initial, userId }: NeedFormProp
       </AlertDialog>
 
       <form onSubmit={onSubmit} className="space-y-6">
+        {aiDraftEnabled ? (
+          <AiDraftPanel
+            type="NEED"
+            onApply={(partial) => applyDraftToForm(setValue as never, partial)}
+          />
+        ) : null}
         {/* 基本信息 */}
         <Card>
           <CardHeader>

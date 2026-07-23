@@ -28,6 +28,8 @@ import {
 import { SERVICE_CATEGORIES, SERVICE_FORMATS } from "@/lib/constants/service";
 import { expandSearchTerms } from "@/lib/search";
 import { aggregateRatings, ratingNumber } from "@/lib/reputation";
+import { isAiSearchEnabled } from "@/lib/ai/config";
+import { hybridSearchServices, type HybridServiceResult } from "@/lib/ai/hybrid-search";
 
 export const dynamic = "force-dynamic";
 
@@ -75,7 +77,7 @@ export default async function ServicesPage({
   const sortRaw = typeof sp.sort === "string" ? sp.sort : "latest";
   const sort: SortValue =
     (SORT_OPTIONS.find((o) => o.value === sortRaw)?.value ?? "latest") as SortValue;
-  const page = parsePage(sp.page);
+  let page = parsePage(sp.page);
   // 搜索词展开(同义词 + 分词):让 "ipad" 也能命中 "平板电脑" 等。
   const searchTerms = expandSearchTerms(search);
 
@@ -98,18 +100,41 @@ export default async function ServicesPage({
   // 排序:最新发布(按 createdAt desc)。
   const orderBy = [{ createdAt: "desc" as const }];
 
-  const [total, services] = await Promise.all([
-    prisma.service.count({ where }),
-    prisma.service.findMany({
-      where,
-      orderBy,
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-      include: {
-        provider: { select: { nickname: true } },
-      },
-    }),
-  ]);
+  const smartActive = isAiSearchEnabled() && search !== "";
+  let services: HybridServiceResult["items"] = [];
+  let total = 0;
+  let usedSmart = false;
+  if (smartActive) {
+    try {
+      const r = await hybridSearchServices({
+        status: ["ACTIVE"],
+        category,
+        search,
+        page,
+        pageSize: PAGE_SIZE,
+      });
+      services = r.items;
+      total = r.total;
+      page = r.page;
+      usedSmart = true;
+    } catch {
+      usedSmart = false;
+    }
+  }
+  if (!usedSmart) {
+    [total, services] = await Promise.all([
+      prisma.service.count({ where }),
+      prisma.service.findMany({
+        where,
+        orderBy,
+        skip: (page - 1) * PAGE_SIZE,
+        take: PAGE_SIZE,
+        include: {
+          provider: { select: { nickname: true } },
+        },
+      }),
+    ]);
+  }
 
   const providerRatings = await aggregateRatings(
     services.map((s) => s.providerId),
@@ -198,7 +223,7 @@ export default async function ServicesPage({
             name="search"
             type="search"
             defaultValue={search}
-            placeholder="搜索服务标题或描述"
+            placeholder="搜索关键词或描述你想要的服务"
             className="flex-1"
           />
           {category ? (
@@ -280,6 +305,13 @@ export default async function ServicesPage({
           </form>
         </div>
       </div>
+
+      {usedSmart ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Badge variant="secondary">智能搜索</Badge>
+          <span>按语义相关度排序（融合关键词 / 新鲜度 / 信誉）</span>
+        </div>
+      ) : null}
 
       {/* ── 服务网格 ── */}
       {services.length === 0 ? (

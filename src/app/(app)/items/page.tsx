@@ -28,6 +28,8 @@ import {
 import { ITEM_CATEGORIES } from "@/lib/constants/item";
 import { expandSearchTerms } from "@/lib/search";
 import { aggregateRatings, ratingNumber } from "@/lib/reputation";
+import { isAiSearchEnabled } from "@/lib/ai/config";
+import { hybridSearchItems } from "@/lib/ai/hybrid-search";
 import { PackageOpen } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -141,19 +143,48 @@ export default async function ItemsPage({
           ? [{ createdAt: "asc" }]
           : [{ createdAt: "desc" }];
 
-  const total = await prisma.item.count({ where });
-  // 分页越界保护:page 超过总页数时收敛到最后一页,避免空结果死胡同。
+  // 智能搜索（语义+关键词混合）：开关开且有搜索词时启用；失败自动回退关键词。
+  const smartActive = isAiSearchEnabled() && search !== "";
+  let items: Array<
+    Prisma.ItemGetPayload<{ include: { seller: { select: { nickname: true } } } }>
+  > = [];
+  let total = 0;
+  let usedSmart = false;
+  if (smartActive) {
+    try {
+      const r = await hybridSearchItems({
+        status,
+        category,
+        minPrice,
+        maxPrice,
+        search,
+        page,
+        pageSize: PAGE_SIZE,
+      });
+      items = r.items;
+      total = r.total;
+      page = r.page;
+      usedSmart = true;
+    } catch {
+      usedSmart = false;
+    }
+  }
+  if (!usedSmart) {
+    total = await prisma.item.count({ where });
+    // 分页越界保护:page 超过总页数时收敛到最后一页,避免空结果死胡同。
+    const tp = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    page = Math.min(page, tp);
+    items = await prisma.item.findMany({
+      where,
+      orderBy,
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+      include: {
+        seller: { select: { nickname: true } },
+      },
+    });
+  }
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  page = Math.min(page, totalPages);
-  const items = await prisma.item.findMany({
-    where,
-    orderBy,
-    skip: (page - 1) * PAGE_SIZE,
-    take: PAGE_SIZE,
-    include: {
-      seller: { select: { nickname: true } },
-    },
-  });
 
   const sellerRatings = await aggregateRatings(
     items.map((i) => i.sellerId),
@@ -222,7 +253,7 @@ export default async function ItemsPage({
             name="search"
             type="search"
             defaultValue={search}
-            placeholder="搜索物品标题或描述"
+            placeholder="搜索关键词或描述你想要的物品"
             className="min-w-[12rem] flex-1"
           />
           <Input
@@ -285,6 +316,13 @@ export default async function ItemsPage({
           </Button>
         </form>
       </div>
+
+      {usedSmart ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Badge variant="secondary">智能搜索</Badge>
+          <span>按语义相关度排序（融合关键词 / 新鲜度 / 信誉）</span>
+        </div>
+      ) : null}
 
       {/* ── 物品网格 ── */}
       {items.length === 0 ? (

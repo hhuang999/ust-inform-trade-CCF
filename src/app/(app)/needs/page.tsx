@@ -33,6 +33,8 @@ import {
   EXPECTED_TIMES,
 } from "@/lib/constants/need";
 import { expandSearchTerms } from "@/lib/search";
+import { isAiSearchEnabled } from "@/lib/ai/config";
+import { hybridSearchNeeds, type HybridNeedResult } from "@/lib/ai/hybrid-search";
 
 export const dynamic = "force-dynamic";
 
@@ -79,7 +81,7 @@ export default async function NeedsPage({
     (NEED_FORMAT_PREFERENCES as readonly string[]).includes(sp.formatPref)
       ? (sp.formatPref as string)
       : undefined;
-  const page = parsePage(sp.page);
+  let page = parsePage(sp.page);
   // 搜索词展开(同义词 + 分词):让 "ipad" 也能命中 "平板电脑" 等。
   const searchTerms = expandSearchTerms(search);
 
@@ -104,25 +106,50 @@ export default async function NeedsPage({
     { createdAt: "desc" },
   ];
 
-  const [total, needs] = await Promise.all([
-    prisma.need.count({ where }),
-    prisma.need.findMany({
-      where,
-      orderBy,
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-      include: {
-        requester: { select: { nickname: true } },
-        _count: {
-          select: {
-            matches: {
-              where: { status: { in: ["APPLIED", "MATCHED"] } },
+  const smartActive = isAiSearchEnabled() && search !== "";
+  let needs: HybridNeedResult["items"] = [];
+  let total = 0;
+  let usedSmart = false;
+  if (smartActive) {
+    try {
+      const r = await hybridSearchNeeds({
+        status: ["OPEN"],
+        category,
+        expectedTime,
+        formatPreference: formatPref,
+        search,
+        page,
+        pageSize: PAGE_SIZE,
+      });
+      needs = r.items;
+      total = r.total;
+      page = r.page;
+      usedSmart = true;
+    } catch {
+      usedSmart = false;
+    }
+  }
+  if (!usedSmart) {
+    [total, needs] = await Promise.all([
+      prisma.need.count({ where }),
+      prisma.need.findMany({
+        where,
+        orderBy,
+        skip: (page - 1) * PAGE_SIZE,
+        take: PAGE_SIZE,
+        include: {
+          requester: { select: { nickname: true } },
+          _count: {
+            select: {
+              matches: {
+                where: { status: { in: ["APPLIED", "MATCHED"] } },
+              },
             },
           },
         },
-      },
-    }),
-  ]);
+      }),
+    ]);
+  }
 
   const requesterRatings = await aggregateRatings(
     needs.map((n) => n.requesterId),
@@ -209,7 +236,7 @@ export default async function NeedsPage({
             name="search"
             type="search"
             defaultValue={search}
-            placeholder="搜索需求标题或描述"
+            placeholder="搜索关键词或描述你的需求"
             className="flex-1"
           />
           {category ? <input type="hidden" name="category" value={category} /> : null}
@@ -283,6 +310,13 @@ export default async function NeedsPage({
           </form>
         </div>
       </div>
+
+      {usedSmart ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Badge variant="secondary">智能搜索</Badge>
+          <span>按语义相关度排序（融合关键词 / 新鲜度 / 信誉）</span>
+        </div>
+      ) : null}
 
       {/* ── 需求网格 ── */}
       {needs.length === 0 ? (
